@@ -51,4 +51,4 @@ async def download_video_endpoint(request_data: VideoRequest):
 # Блок для запуска сервера прямо из IntelliJ IDEA
 if __name__ == "__main__":
   import uvicorn
-  uvicorn.run(app, host="127.0.0.1", port=9001)
+  uvicorn.run(app, host="0.0.0.0", port=9001)
