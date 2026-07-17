@@ -1,14 +1,14 @@
 import os
 import tempfile
-import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 import yt_dlp
 
-def download_to_memory(url: str) -> tuple[str, bytes]:
+
+def _download_to_memory_impl(url: str) -> tuple[str, bytes]:
 
   with tempfile.TemporaryDirectory() as temp_dir:
 
-    # Используем простое имя файла для избежания проблем кодирования
     safe_filename = "video.mp4"
     temp_file = os.path.join(temp_dir, safe_filename)
     
@@ -16,21 +16,19 @@ def download_to_memory(url: str) -> tuple[str, bytes]:
       'format': 'best',
       'quiet': True,
       'no_warnings': True,
-      'outtmpl': temp_file.replace('.mp4', ''),  # yt-dlp добавит расширение
+      'outtmpl': temp_file.replace('.mp4', ''),
       'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'restrictfilenames': True,  # Ограничивает спецсимволы в именах файлов
-      'encoding': 'utf-8',  # Явно указываем UTF-8 кодировку
+      'restrictfilenames': True,
+      'encoding': 'utf-8',
       'noprogress': True,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
       info = ydl.extract_info(url, download=True)
-      # Получаем оригинальное имя видео для возврата клиенту
       original_title = info.get('title', 'video')
       ext = info.get('ext', 'mp4')
       base_filename = f"{original_title}.{ext}"
 
-      # Ищем загруженный файл в temp_dir
       files = os.listdir(temp_dir)
       if files:
         downloaded_file_path = os.path.join(temp_dir, files[0])
@@ -40,10 +38,18 @@ def download_to_memory(url: str) -> tuple[str, bytes]:
             video_bytes = f.read()
           return base_filename, video_bytes
       
-      raise FileNotFoundError("yt-dlp завершил работу, но итоговый файл не найден.")
+      raise FileNotFoundError("yt-dlp completed, but the output file was not found.")
+
+def download_to_memory(url: str) -> tuple[str, bytes]:
+  executor = ThreadPoolExecutor(max_workers=1)
+  future = executor.submit(_download_to_memory_impl, url)
+  result = future.result()
+  executor.shutdown(wait=True)
+  return result
+
 
 def download_video(url):
-  print("Инициализация загрузки... Это может занять некоторое время.")
+  print("Initializing download... This may take some time.")
 
   ydl_opts = {
     'format': 'best',
@@ -52,17 +58,17 @@ def download_video(url):
 
   try:
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-      print("Анализируем ссылку и скачиваем...")
+      print("Analyzing link and downloading...")
       ydl.download([url])
-    print("\n[УСПЕХ] Видео успешно скачано в папку проекта!")
+    print("\n[SUCCESS] Video successfully downloaded to the project folder!")
   except Exception as e:
-    print(f"\n[ОШИБКА] Не удалось скачать видео: {e}")
+    print(f"\n[ERROR] Failed to download video: {e}")
 
 if __name__ == "__main__":
-  print("--- Универсальный Скачиватель Видео ---")
-  user_url = input("Вставь ссылку на видео (YouTube, TikTok или Instagram): ").strip()
+  print("--- Universal Video Downloader ---")
+  user_url = input("Paste a video link (YouTube, TikTok or Instagram): ").strip()
 
   if user_url:
     download_video(user_url)
   else:
-    print("Ссылка не может быть пустой.")
+    print("URL cannot be empty.")
