@@ -1,47 +1,45 @@
 import os
-import io
 import tempfile
+import uuid
 
 import yt_dlp
 
 def download_to_memory(url: str) -> tuple[str, bytes]:
-  """
-  Скачивает видео во временный файл, читает его в байты и удаляет файл.
-  """
-  # Имя файла мы узнаем в процессе скачивания, используя специальный хук
-  downloaded_file_path = None
 
-  # Создаем временную директорию ОС, которая сама очистится
   with tempfile.TemporaryDirectory() as temp_dir:
 
+    # Используем простое имя файла для избежания проблем кодирования
+    safe_filename = "video.mp4"
+    temp_file = os.path.join(temp_dir, safe_filename)
+    
     ydl_opts = {
       'format': 'best',
       'quiet': True,
       'no_warnings': True,
-      # Скачиваем строго во временную папку
-      'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
+      'outtmpl': temp_file.replace('.mp4', ''),  # yt-dlp добавит расширение
       'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'restrictfilenames': True,  # Ограничивает спецсимволы в именах файлов
+      'encoding': 'utf-8',  # Явно указываем UTF-8 кодировку
+      'noprogress': True,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-      # Извлекаем инфо
       info = ydl.extract_info(url, download=True)
-      # Получаем реальное имя файла, которое сохранила библиотека
-      filename = ydl.prepare_filename(info)
-      # Выделяем только базовое имя (например, "video.mp4") для отправки клиенту
-      base_filename = os.path.basename(filename)
+      # Получаем оригинальное имя видео для возврата клиенту
+      original_title = info.get('title', 'video')
+      ext = info.get('ext', 'mp4')
+      base_filename = f"{original_title}.{ext}"
 
-      # Находим, куда физически лег файл внутри temp_dir
-      downloaded_file_path = ydl.prepare_filename(info)
-
-    # Читаем файл в массив байт
-    if downloaded_file_path and os.path.exists(downloaded_file_path):
-      with open(downloaded_file_path, "rb") as f:
-        video_bytes = f.read()
-
-      # Возвращаем имя файла и его байты
-      return base_filename, video_bytes
-    else:
+      # Ищем загруженный файл в temp_dir
+      files = os.listdir(temp_dir)
+      if files:
+        downloaded_file_path = os.path.join(temp_dir, files[0])
+        
+        if os.path.exists(downloaded_file_path):
+          with open(downloaded_file_path, "rb") as f:
+            video_bytes = f.read()
+          return base_filename, video_bytes
+      
       raise FileNotFoundError("yt-dlp завершил работу, но итоговый файл не найден.")
 
 def download_video(url):
