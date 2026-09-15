@@ -13,7 +13,7 @@ def _download_to_memory_impl(url: str) -> tuple[str, bytes]:
     temp_file = os.path.join(temp_dir, safe_filename)
     
     ydl_opts = {
-      'format': 'best',
+      'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
       'quiet': True,
       'no_warnings': True,
       'outtmpl': temp_file.replace('.mp4', ''),
